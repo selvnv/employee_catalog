@@ -3,11 +3,9 @@ name: employee_catalog
 services:
   db:
     image: postgres:18
-    restart: always
+    restart: on-failure
     ports:
       - 5432:5432
-    volumes:
-      - employees:/var/lib/postgresql
     env_file:
       - ./.env/postgres.env
     healthcheck:
@@ -16,6 +14,32 @@ services:
       timeout: 5s
       retries: 5
       start_period: 10s
+    networks:
+      - postgres
+    volumes:
+      - ./schema:/docker-entrypoint-initdb.d
+    #   - employeesdb:/var/lib/postgresql
+
+  dbui:
+    image: dpage/pgadmin4:latest
+    ports:
+      - "8180:80"
+    restart: unless-stopped
+    env_file:
+      - ./.env/pgadmin.env
+    depends_on:
+      db:
+        condition: service_healthy
+    networks:
+      - postgres
+    # volumes:
+    #   - pgadmin:/var/lib/pgadmin
+
+
+networks:
+  postgres:
+    driver: bridge
 
 # volumes:
-#   employees:
+#   employeesdb:
+#   pgadmin:
