@@ -1,8 +1,8 @@
 import os
 import re
+import psycopg2
 
 from pathlib import Path
-
 
 class PostgresConfig:
 
@@ -17,22 +17,47 @@ class PostgresConfig:
         if len(port) > 0 and not re.match(r"^\d+$", port):
             raise ValueError(f"Port value must contains only digits. Now value is {port}")
 
-        self.host = host
-        self.port = port
-        self.dbname = dbname
-        self.connection_user = connection_user
-        self.connection_pass = connection_pass
+        self._host = host
+        self._port = port
+        self._dbname = dbname
+        self._connection_user = connection_user
+        self._connection_pass = connection_pass
 
 
     def __repr__(self):
         return (
             f"Postgres connection config\n" +
-            f"Host: {self.host}\n" +
-            f"Port: {self.port}\n" +
-            f"Database: {self.dbname}\n" +
-            f"Connection username: {self.connection_user}\n" +
-            f"Connection password: {self.connection_pass}\n"
+            f"Host: {self._host}\n" +
+            f"Port: {self._port}\n" +
+            f"Database: {self._dbname}\n" +
+            f"Connection username: {self._connection_user}\n" +
+            f"Connection password: {self._connection_pass}\n"
         )
+
+
+    @property
+    def host(self):
+        return self._host
+
+
+    @property
+    def port(self):
+        return self._port
+
+
+    @property
+    def dbname(self):
+        return self._dbname
+
+
+    @property
+    def connection_user(self):
+        return self._connection_user
+
+
+    @property
+    def connection_pass(self):
+        return self._connection_pass
 
 
     @staticmethod
@@ -78,17 +103,17 @@ class PostgresConfig:
                 if not re.match(r"^\d+$", var_value):
                     raise ValueError(f"Port value must contains only digits. Now value is {var_value}")
 
-        self.host = loaded_variables["PG_HOST"]
-        self.port = loaded_variables["PG_PORT"]
-        self.dbname = loaded_variables["PG_DB_NAME"]
-        self.connection_user = loaded_variables["PG_USER"]
-        self.connection_pass = loaded_variables["PG_PASSWORD"]
+        self._host = loaded_variables["PG_HOST"]
+        self._port = loaded_variables["PG_PORT"]
+        self._dbname = loaded_variables["PG_DB_NAME"]
+        self._connection_user = loaded_variables["PG_USER"]
+        self._connection_pass = loaded_variables["PG_PASSWORD"]
 
 
     def load_from_env_file(self, path: str):
         filepath = Path(path)
 
-        if filepath.exists():
+        if filepath.exists() and filepath.is_file():
             with filepath.open(mode="r", encoding="utf-8") as file:
                 for line in file:
                     clear_line = line.strip()
@@ -106,18 +131,64 @@ class PostgresConfig:
                     cleaned_value = self._clean_value(value)
 
                     if cleaned_arg == "PG_HOST":
-                        self.host = cleaned_value
+                        self._host = cleaned_value
                     elif cleaned_arg == "PG_PORT":
                         if not re.match(r"^\d+$", cleaned_value):
                             raise ValueError(f"Port value must contains only digits. Now value is {value}")
-                        self.port = cleaned_value
+                        self._port = cleaned_value
                     elif cleaned_arg == "PG_DB_NAME":
-                        self.dbname = cleaned_value
+                        self._dbname = cleaned_value
                     elif cleaned_arg == "PG_USER":
-                        self.connection_user = cleaned_value
+                        self._connection_user = cleaned_value
                     elif cleaned_arg == "PG_PASSWORD":
-                        self.connection_pass = cleaned_value
+                        self._connection_pass = cleaned_value
                     else:
                         print(f"\033[1m\033[93m[WARN] load_from_env_file({path}) >>>>\033[0m Unknown config parameter {arg}")
         else:
             raise ValueError(f"Path {path} does not exists")
+
+
+    # Check connection to database with current config settings
+    def healthcheck(self):
+        connection = None
+        try:
+
+            connection = psycopg2.connect(
+                host=self.host,
+                port=self.port,
+                dbname=self.dbname,
+                user=self.connection_user,
+                password=self.connection_pass
+            )
+
+            with connection.cursor() as cursor:
+                cursor.execute("SELECT 1;")
+
+            return True
+
+        except Exception as error:
+            print(f"Healthcheck failed {repr(error)}")
+            return False
+
+        finally:
+            if connection is not None:
+                connection.close()
+
+
+    def get_connection(self):
+        connection = None
+        try:
+            connection = psycopg2.connect(
+                host=self.host,
+                port=self.port,
+                dbname=self.dbname,
+                user=self.connection_user,
+                password=self.connection_pass
+            )
+        except Exception as error:
+            print(f"Healthcheck failed {repr(error)}")
+
+        return connection
+
+
+POSTGRES_CONFIG = PostgresConfig()

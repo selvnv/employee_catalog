@@ -64,6 +64,9 @@ docker volume rm employee_catalog_pgadmin employee_catalog_employeesdb
 
 # Подключение к контейнеру базы данных
 docker exec -it employee_catalog-db-1 sh
+
+# Сборка пакета с помощью setuptools в редактируемом режиме
+uv pip install -e .
 ```
 
 ### Реализация
@@ -195,3 +198,31 @@ CREATE INDEX IF NOT EXISTS idx_employees_salary     ON employees(salary);
 - GRANT — выдача прав доступа
 - REVOKE — снятие (отзыв) прав доступа
 
+##### Встреченные ошибки по ходу проекта
+
+При подключении с хоста к адресу `localhost:5432`, по которому расположена база данных столкнулся с ошибкой
+
+```bash
+'utf-8' codec can't decode byte 0xc2 in position 61: invalid continuation byte
+```
+
+Как понятно из текста ошибки, `psycopg` ожидает данные (от клиента или сервера) в формате `UTF-8`, однако на вход получает данные в иной кодировке
+
+Однако суть становится ясна только при более полном выводе ошибки (например, с помощью `__repr__`)
+
+```bash
+# UnicodeDecodeError(encoding, object, start, end, reason)
+UnicodeDecodeError('utf-8', b'connection to server at "127.0.0.1", port 5432 failed: \xc2\xc0\xc6\xcd\xce:  \xef\xee\xeb\xfc\xe7\xee\xe2\xe0\xf2\xe5\xeb\xfc "catalog_app" \xed\xe5 \xef\xf0\xee\xf8\xb8\xeb \xef\xf0\xee\xe2\xe5\xf0\xea\xf3 \xef\xee\xe4\xeb\xe8\xed\xed\xee\xf1\xf2\xe8 (\xef\xee \xef\xe0\xf0\xee\xeb\xfe)\n', 55, 56, 'invalid continuation byte')
+```
+
+Здесь уже становится понятно, что запрос к СУБД проходит, и она даже отвечает. Вот только ответ предоставляет в кодировке `CP1251`
+
+```python
+b'\xc2\xc0\xc6\xcd\xce:  \xef\xee\xeb\xfc\xe7\xee\xe2\xe0\xf2\xe5\xeb\xfc "catalog_app" \xed\xe5 \xef\xf0\xee\xf8\xb8\xeb \xef\xf0\xee\xe2\xe5\xf0\xea\xf3 \xef\xee\xe4\xeb\xe8\xed\xed\xee\xf1\xf2\xe8 (\xef\xee \xef\xe0\xf0\xee\xeb\xfe)\n'.decode("cp1251")
+# 'ВАЖНО:  пользователь "catalog_app" не прошёл проверку подлинности (по паролю)\n'
+```
+
+Как оказалось, на хосте установлен локально PostgreSQL, который, судя по всему, прослушивал подключения на `localhost:5432`. 
+При этом Docker-контейнер с базой данных запускался с пробросом на тот же порт хоста `5432`
+
+Проблему решил изменением в `docker-compose.yml` порта для доступа к базе данных с хоста: `5432` на `5435` (подойдет любой свободный порт)
