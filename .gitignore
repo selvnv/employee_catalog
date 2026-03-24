@@ -2,3 +2,5 @@
 schema/
 __pycache__
 .idea/
+*.egg-info/
+build/

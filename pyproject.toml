@@ -12,6 +12,12 @@ dependencies = [
     "tabulate>=0.10.0",
 ]
 
-#[build-system]
-#requires = ["setuptools"]
-#build-backend = "setuptools.build_meta"
+[project.scripts]
+edb = "modules.pgdriver.operations:edb"
+
+[build-system]
+requires = ["setuptools"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools]
+packages = ["modules"]
