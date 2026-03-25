@@ -3,7 +3,8 @@ from tabulate import tabulate
 
 from .pgdriver import read_pg_config
 from .pgdriver import list_employees
-from .data_generation import personal_data_generator
+from .data_generation import generate_employee_data
+from .data_generation import random_date, generate_probability_distribution, generate_salary_ranges
 
 @click.group(name='edb')
 def edb():
@@ -12,12 +13,12 @@ def edb():
 
 @edb.command()
 def gen():
-    headers = ["id", "last_name", "first_name", "position", "hire_date", "salary", "manager_id"]
-    data = personal_data_generator()
-    tab_data = [[item['last_name'], item['first_name'], item['middle_name']]
-              for item in data]
-    print(tabulate(tab_data, headers, tablefmt="github"))
-    # print(data)
+    # headers = ["id", "last_name", "first_name", "position", "hire_date", "salary", "manager_id"]
+    # data = generate_employee_data()
+    # tab_data = [[item['last_name'], item['first_name'], item['middle_name']]
+    #           for item in data]
+    # print(tabulate(tab_data, headers, tablefmt="github"))
+    print(generate_salary_ranges(1000, 10000, 5))
 
 @edb.command()
 def add():
