@@ -1,25 +1,45 @@
 import random
+
 from datetime import datetime
+
 from mimesis import Person
 from mimesis import Locale
 from mimesis.enums import Gender
+
 from numpy import logspace
 
-COMPANY_POSITION_RATIO = {
-    "ceo": 1,
-    "manager": 250,
-    "team_lead": 1_500,
-    "senior_developer": 12_500,
-    "developer": 35_749
-}
 
-
-SALARY_RANGE = {
-    "ceo": (500_000, 800_000),
-    "manager": (350_000, 500_000),
-    "team_lead": (200_000, 500_000),
-    "senior_developer": (300_000, 500_000),
-    "developer": (100_000, 250_000)
+DEFAULT_ORG_STRUCTURE = {
+    "ceo": {
+        "position_name": "ceo",
+        "count": 1,
+        "min_salary": 500_000,
+        "max_salary": 800_000
+    },
+    "manager": {
+        "position_name": "manager",
+        "count": 250,
+        "min_salary": 350_000,
+        "max_salary": 500_000
+    },
+    "team_lead": {
+        "position_name": "team_lead",
+        "count": 1_500,
+        "min_salary": 300_000,
+        "max_salary": 500_000
+    },
+    "senior_developer": {
+        "position_name": "senior_developer",
+        "count": 12_500,
+        "min_salary": 200_000,
+        "max_salary": 450_000
+    },
+    "developer": {
+        "position_name": "developer",
+        "count": 35_749,
+        "min_salary": 100_000,
+        "max_salary": 250_000
+    }
 }
 
 
@@ -29,12 +49,15 @@ MIN_SALARY_SPREAD_COEFFICIENT = 0.05
 DEFAULT_EXP_GEN_BASE = 5
 DEFAULT_PROB_DIST_GEN_BASE = 2.5
 
-DEFAULT_MIN_RANDOM_DATE = "1971-01-01"
-DEFAULT_MAX_RANDOM_DATE = datetime.now().strftime("%Y-%m-%d")
+DEFAULT_MIN_HIRE_DATE = "2020-01-01"
+DEFAULT_MAX_HIRE_DATE = datetime.now().strftime("%Y-%m-%d")
 
 
-def random_date(start: str = DEFAULT_MIN_RANDOM_DATE,
-                end: str = DEFAULT_MAX_RANDOM_DATE) -> str | None:
+DEFAULT_MIN_SALARY = 80_000
+DEFAULT_MAX_SALARY = 500_000
+
+
+def random_date(start: str, end: str) -> str | None:
     """
        Generate random date in format YYYY-MM-DD
 
@@ -45,6 +68,10 @@ def random_date(start: str = DEFAULT_MIN_RANDOM_DATE,
        Returns:
            Random date in format YYYY-MM-DD OR None if exception raised
        """
+
+    if not start or not end:
+        print(f"\033[1m\033[93m[WARN] random_date(...) >>>>\033[0m the boundaries of the date range are not set. ")
+        return None
 
     try:
         start_timestamp = int(datetime.fromisoformat(start).timestamp())
@@ -162,61 +189,135 @@ def generate_salary_ranges(min_salary: int, max_salary: int, ranges_count: int =
     return salary_ranges[::-1]
 
 
-def generate_employee_data(person_generator: Person, position: str) -> dict | None:
+def generate_random_salary(min_salary: int, max_salary: int) -> int:
+    return random.randint(min_salary, max_salary)
 
-    if not person_generator:
+
+def calc_org_structure(
+        employee_count: int = 10,
+        position_names: list = None,
+        min_salary: int = DEFAULT_MIN_SALARY,
+        max_salary: int = DEFAULT_MAX_SALARY) -> dict | None:
+    """
+        Generates org_structure for employee catalog in format
+        {
+            "pos_name": {
+                "position_name": pos_name
+                "count": A
+                "min_salary": B,
+                "max_salary": C
+            }
+            ...
+        }
+
+        where A, B, C - int number
+
+        Args:
+            employee_count: count of employees in catalog
+            position_names: names of employee positions
+            min_salary: min salary for employee catalog
+            max_salary: max salary for employee catalog
+
+        Returns:
+            dict representation of employee catalog
+    """
+
+    if employee_count <= 0:
         return None
 
-    if not position or position not in COMPANY_POSITION_RATIO:
+    if position_names is None or len(position_names) == 0:
+        return None
+
+    position_distribution = generate_probability_distribution(len(position_names))
+    salary_ranges = generate_salary_ranges(min_salary, max_salary, len(position_names))
+
+    # Определение количества сотрудников в структуре
+    employee_count_by_position = []
+    for index in range(len(position_names)):
+        # Вычисление количество сотрудников с данной должностью
+        # Если доступно для распределения меньше сотрудников - берем весь доступный остаток
+        employees_by_position =  min(employee_count, int(employee_count * position_distribution[index]))
+        employee_count_by_position.append(employees_by_position)
+
+        # Получение оставшегося количества сотрудников, доступных для распределения
+        employee_count -= employees_by_position
+
+    employee_structure = {}
+    for index in range(len(position_names)):
+        employee_structure[position_names[index]] = {
+            "position_name": position_names[index],
+            "count": employee_count_by_position[index],
+            "min_salary": salary_ranges[index][0],
+            "max_salary": salary_ranges[index][1]
+        }
+
+    return employee_structure
+
+
+def generate_employee_data(person_generator: Person, position_info: dict, min_hire_date: str, max_hire_date: str) -> dict | None:
+
+    if not person_generator:
+        print(f"\033[1m\033[93m[WARN] generate_employee_data(...) >>>>\033[0m person_generator is empty. ")
+        return None
+
+    if not position_info:
+        print(f"\033[1m\033[93m[WARN] generate_employee_data(...) >>>>\033[0m position_info is empty. ")
+        return None
+
+    if not all(key in position_info for key in ["position_name", "count", "min_salary", "max_salary"]):
+        print(
+            f"\033[1m\033[93m[WARN] generate_employee_data(...) >>>>\033[0m" +
+            f"position_info must contain [\"count\", \"min_salary\", \"max_salary\"] keys, but contains only {position_info.keys()}. "
+        )
         return None
 
     gender = random.choice(list(Gender))
     person_data = {
-        "id": "?",
         "last_name": person_generator.last_name(gender=gender),
         "first_name": person_generator.first_name(gender=gender),
         "middle_name": person_generator.patronymic(gender=gender),
-        "position": position,
-        "hire_date": random_date("2020-01-01", "2026-01-01"),
-        "salary": "?",
-        "manager_id": "?"
+        "position": position_info["position_name"],
+        "hire_date": random_date(min_hire_date,  max_hire_date),
+        "salary": generate_random_salary(position_info["min_salary"], position_info["max_salary"])
     }
 
     return person_data
 
 
-def generate_employees_catalog(total_count: int = 10):
+def generate_employees_catalog(
+        total_count: int,
+        position_names: list,
+        min_salary: int = DEFAULT_MIN_SALARY,
+        max_salary: int = DEFAULT_MAX_SALARY,
+        min_hire_date: str = DEFAULT_MIN_HIRE_DATE,
+        max_hire_date: str = DEFAULT_MAX_HIRE_DATE) -> list:
+    """
+        Generates a list of employees with random personal data (with specified restrictions)
+
+        Args:
+            total_count: count of employees in catalog
+            position_names: names of employee positions
+            min_salary: min salary for employee catalog
+            max_salary: max salary for employee catalog
+            min_hire_date: min hire date for employee catalog
+            max_hire_date: max hire date for employee catalog
+
+        Returns:
+            list of employees with random personal data
+    """
     if total_count <= 0:
         return []
 
-    # Количество сотрудников, которое можно сгенерировать
-    employees_left = total_count
-    # При генерации сохраняются пропорции количества сотрудников на определенном уровне иерархии
-    ratio = total_count / sum(COMPANY_POSITION_RATIO.values())
+    if position_names is None or len(position_names) == 0:
+        return []
 
-    fact_position_ratio = {
-        # CEO всегда один
-        "ceo": 1,
-    }
-
-    employees_left = max(0, employees_left - fact_position_ratio["ceo"])
-
-    fact_position_ratio["manager"] = min(employees_left, int(COMPANY_POSITION_RATIO["manager"] * ratio))
-    employees_left = max(0, employees_left - fact_position_ratio["manager"])
-
-    fact_position_ratio["team_lead"] = min(employees_left, int(COMPANY_POSITION_RATIO["team_lead"] * ratio))
-    employees_left = max(0, employees_left - fact_position_ratio["team_lead"])
-
-    fact_position_ratio["senior_developer"] = min(employees_left, int(COMPANY_POSITION_RATIO["senior_developer"] * ratio))
-    employees_left = max(0, employees_left - fact_position_ratio["senior_developer"])
-
-    fact_position_ratio["developer"] = min(employees_left, int(COMPANY_POSITION_RATIO["developer"] * ratio))
-    employees_left = max(0, employees_left - fact_position_ratio["developer"])
+    org_structure = calc_org_structure(total_count, position_names, min_salary, max_salary)
 
     person_generator = Person(locale=Locale.RU)
-    for position, count in fact_position_ratio.items():
-        for _ in range(count):
-            generate_employee_data(person_generator, position)
+    employees = []
+    for position in org_structure:
+        for _ in range(org_structure[position]["count"]):
+            person_data = generate_employee_data(person_generator, org_structure[position], min_hire_date, max_hire_date)
+            employees.append(person_data)
 
-
-    person_list = generate_employee_data(count=total_count)
+    return employees

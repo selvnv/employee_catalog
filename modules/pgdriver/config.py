@@ -167,7 +167,7 @@ class PostgresConfig:
             return True
 
         except Exception as error:
-            print(f"Healthcheck failed {repr(error)}")
+            print(f"\033[1m\033[91m[WARN] healthcheck(...) >>>>\033[0m Healthcheck failed", repr(error))
             return False
 
         finally:
@@ -186,7 +186,7 @@ class PostgresConfig:
                 password=self.connection_pass
             )
         except Exception as error:
-            print(f"Healthcheck failed {repr(error)}")
+            print(f"\033[1m\033[91m[WARN] get_connection(...) >>>>\033[0m Connection failed", repr(error))
 
         return connection
 

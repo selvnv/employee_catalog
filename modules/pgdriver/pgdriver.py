@@ -84,3 +84,31 @@ def list_employees(limit: int = None, order_field: str = None, where_conditions:
         print(f"\033[1m\033[93m[WARN] list_employees(...) >>>>\033[0m {error}")
 
     return []
+
+
+def add_employee(
+        last_name: str,
+        first_name: str,
+        middle_name: str,
+        position: str,
+        hire_date: str,
+        salary: float,
+        manager_id: int = None,
+):
+    try:
+        with POSTGRES_CONFIG.get_connection() as connection:
+            with connection.cursor() as cursor:
+                cursor.execute(
+                    """
+                    INSERT INTO employees (last_name, first_name, middle_name, position, hire_date, salary, manager_id) 
+                    VALUES (%s, %s, %s, %s, %s, %s, %s)
+                    RETURNING id
+                    """,
+                    (last_name, first_name, middle_name, position, hire_date, salary, manager_id),
+                )
+
+                # cursor.fetchone() returns tuple like (id,)
+                employee_id = cursor.fetchone()[0]
+                return employee_id
+    except Exception as error:
+        print(f"\033[1m\033[91m[WARN] add_employee(...) >>>>\033[0m {error}")
