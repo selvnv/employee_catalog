@@ -183,7 +183,6 @@ def delete_employees(
 
 
 def generate_update_query(employee_data: UpdateEmployee):
-    query = ""
     args = []
 
     set_clauses = []
@@ -211,7 +210,6 @@ def generate_update_query(employee_data: UpdateEmployee):
         # manager_id == 0, ничего не делать
         # manager_id > 0, установить заданный manager_id
         if employee_data.manager_id == -1:
-            query += ("," if query else "") + f" manager_id = NULL"
             set_clauses.append("manager_id = NULL")
         else:
             set_clauses.append("manager_id = %s")
@@ -239,11 +237,9 @@ def update_employee(employee: UpdateEmployee) -> tuple:
         with POSTGRES_CONFIG.get_connection() as connection:
             with connection.cursor() as cursor:
                 query, args = generate_update_query(employee)
-                print(query)
-                print(args)
 
                 cursor.execute(query, args)
-                response = cursor.fetchall()[0]
+                response = cursor.fetchone()[0]
                 return response
     except Exception as error:
         print(f"\033[1m\033[91m[ERROR] update_employee(...) >>>>\033[0m {error}")
