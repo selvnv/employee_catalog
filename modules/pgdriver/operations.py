@@ -2,13 +2,13 @@ import click
 
 from datetime import datetime
 
-from click import IntRange, FloatRange
+from click import IntRange, FloatRange, DateTime
 
 from .pgdriver import read_pg_config
-from .pgdriver import list_employees, add_employee, delete_employees, update_employee, drop_data
+from .pgdriver import list_employees, add_employee, delete_employees, update_employee, drop_data, select_hierarchy
 from .data_generation import create_employees_catalog
 
-from modules.utils.utils import print_employee_table_paged
+from modules.utils.utils import print_employee_table_paged, print_hierarchy
 
 from modules.models.employee import UpdateEmployee, InsertEmployee
 
@@ -28,11 +28,20 @@ def edb():
     help="""
         Salary range: min_salary max_salary
     """)
+@click.option("--hire-date", "-h", nargs=2, type=DateTime(formats=["%Y-%m-%d"]), required=True,
+    help="""
+        Hire date range: min_hire_date max_hire_date
+    """)
 @click.argument("positions", nargs=-1, type=str, required=True)
-def gen(count, salary, positions):
+def gen(count, salary, hire_date, positions):
     try:
         employee_list = create_employees_catalog(
-            count, positions, min(salary), max(salary)
+            total_count=count,
+            position_names=positions,
+            min_salary=min(salary),
+            max_salary=max(salary),
+            min_hire_date=min(hire_date).strftime("%Y-%m-%d"),
+            max_hire_date=max(hire_date).strftime("%Y-%m-%d")
         )
 
         print(f"\033[1m\033[92m[COMPLETED]\033[0m Employee catalog data generated and saved into employees")
@@ -157,8 +166,10 @@ def lst(limit, order, where):
 
 
 @edb.command()
-def tree():
-    print("tree edb")
+@click.option("--top-position", "-t", nargs=1, type=str, required=True)
+def tree(top_position):
+    employees = select_hierarchy(top_position)
+    print_hierarchy(employees)
 
 
 @edb.command()

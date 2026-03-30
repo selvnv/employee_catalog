@@ -38,3 +38,33 @@ def print_employee_table_paged(row_data,
             break
 
         current_page += 1
+
+
+def print_hierarchy(row_data):
+    levels = [row[5] for row in row_data]
+    max_level = max(levels)
+    is_last_level = [False for _ in range(max_level + 1)]
+
+    row_count = len(row_data)
+
+    for i, row in enumerate(row_data):
+        current_row_level = row[5]
+        if i < row_count - 1:
+            next_row_level = row_data[i + 1][5]
+
+            # Является ли элемент листовым на своем уровне
+            is_last_on_level = not current_row_level in levels[i+1:]
+            if is_last_on_level:
+                is_last_level[current_row_level] = True
+
+            # Является ли наиболее вложенным
+            is_deepest = max_level == max_level and current_row_level > next_row_level
+
+            connector = "└── " if is_last_on_level or is_deepest else "├── "
+            prefix = ""
+            for x in range(0, current_row_level):
+                prefix += "│   " if not is_last_level[x] else "    "
+
+            print(prefix + connector + ", ".join(row[1:5]))
+        else:
+            print(("    " * current_row_level) + "└── ", ", ".join(row[1:5]))

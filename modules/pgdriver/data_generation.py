@@ -1,4 +1,3 @@
-import copy
 import random
 
 from datetime import datetime
@@ -10,7 +9,7 @@ from mimesis.enums import Gender
 from numpy import logspace
 
 from modules.models.employee import InsertEmployee
-from modules.pgdriver.pgdriver import add_employee, add_employees
+from modules.pgdriver.pgdriver import add_employees
 
 DEFAULT_ORG_STRUCTURE = {
     "ceo": {

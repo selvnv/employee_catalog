@@ -249,3 +249,35 @@ def drop_data():
     except Exception as error:
         print(f"\033[1m\033[91m[ERROR] drop_data(...) >>>>\033[0m {error}")
         raise
+
+
+def select_hierarchy(top_position: str):
+    if not top_position:
+        return []
+
+    try:
+        with POSTGRES_CONFIG.get_connection() as connection:
+            with connection.cursor() as cursor:
+                query = f"""
+                    WITH RECURSIVE hierarchy AS (
+                        SELECT id, last_name, first_name, middle_name, position, 0 AS level
+                        FROM employees
+                        WHERE position = %s
+                    
+                        UNION
+                    
+                        SELECT e.id, e.last_name, e.first_name, e.middle_name, e.position, h.level + 1
+                        FROM employees AS e
+                        JOIN hierarchy AS h ON h.id = e.manager_id
+                    ) SEARCH DEPTH FIRST BY id SET path
+                
+                SELECT * FROM hierarchy ORDER BY path;
+                """
+
+                cursor.execute(query, (top_position,))
+
+                employees = [employee_row for employee_row in cursor.fetchall()]
+                return employees
+    except Exception as error:
+        print(f"\033[1m\033[91m[ERROR] select_hierarchy(...) >>>>\033[0m {error}")
+        raise
