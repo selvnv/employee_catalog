@@ -1,10 +1,10 @@
 from psycopg2.extras import execute_values
 
-from typing import Optional, Sequence
+from typing import Sequence
 
 from .config import POSTGRES_CONFIG
 
-from modules.models.employee import UpdateEmployee
+from modules.models.employee import UpdateEmployee, InsertEmployee
 
 ALLOWED_ORDER_BY_FIELDS = {"id", "last_name", "first_name", "position", "hire_date", "salary"}
 ALLOWED_COMPARISON_FIELDS = {"id", "last_name", "first_name", "middle_name", "position", "hire_date", "salary", "manager_id"}
@@ -91,15 +91,10 @@ def list_employees(limit: int = None, order_field: str = None, where_conditions:
     return []
 
 
-def add_employee(
-        last_name: str,
-        first_name: str,
-        middle_name: str,
-        position: str,
-        hire_date: str,
-        salary: float,
-        manager_id: int = None,
-):
+def add_employee(employee: InsertEmployee) -> int:
+    if not employee or not isinstance(employee, InsertEmployee):
+        return -1
+
     try:
         with POSTGRES_CONFIG.get_connection() as connection:
             with connection.cursor() as cursor:
@@ -109,7 +104,7 @@ def add_employee(
                     VALUES (%s, %s, %s, %s, %s, %s, %s)
                     RETURNING id
                     """,
-                    (last_name, first_name, middle_name, position, hire_date, salary, manager_id),
+                    employee.to_insertion_row(),
                 )
 
                 # cursor.fetchone() returns tuple like (id,)
@@ -121,22 +116,17 @@ def add_employee(
 
 
 def add_employees(
-        employees: list[tuple[str, str, Optional[str], str, str, float, Optional[int]]],
-) -> list:
+        employees: list[InsertEmployee],
+) -> list[int]:
     if not employees or len(employees) == 0:
         print(f"\033[1m\033[91m[WARN] add_employees(...) >>>>\033[0m Employee list is empty. Nothing to add")
         return []
 
     for employee in employees:
-        if len(employee) != 7:
-            raise ValueError(
-                f"\nEmployee {employee} is not a valid employee tuple\n" +
-                f"Employee tuple must contain 7 arguments: last_name, first_name, middle_name, position, hire_date, salary, manager_id\n" +
-                "Arguments middle_name, manager_id can be None"
-            )
+        if not employee or not isinstance(employee, InsertEmployee):
+            raise ValueError(f"add_employees(...) >>>> Wrong data or data type.\n Employee list items must be InsertEmployee type but got {type(employee)}")
 
     try:
-        employee_ids = []
         with POSTGRES_CONFIG.get_connection() as connection:
             with connection.cursor() as cursor:
                 query = """
@@ -148,7 +138,9 @@ def add_employees(
                     RETURNING id
                 """
 
-                execute_values(cursor, query, employees, template="(%s, %s, %s, %s, %s, %s, %s)")
+                # Приведение данных от модели к массиву данных для вставки
+                employees_data = [employee.to_insertion_row() for employee in employees]
+                execute_values(cursor, query, employees_data, template="(%s, %s, %s, %s, %s, %s, %s)")
 
                 employee_ids = [row[0] for row in cursor.fetchall()]
                 return employee_ids
@@ -243,4 +235,17 @@ def update_employee(employee: UpdateEmployee) -> tuple:
                 return response
     except Exception as error:
         print(f"\033[1m\033[91m[ERROR] update_employee(...) >>>>\033[0m {error}")
+        raise
+
+
+def drop_data():
+    try:
+        with POSTGRES_CONFIG.get_connection() as connection:
+            with connection.cursor() as cursor:
+                query = """
+                    DELETE FROM employees
+                """
+                cursor.execute(query)
+    except Exception as error:
+        print(f"\033[1m\033[91m[ERROR] drop_data(...) >>>>\033[0m {error}")
         raise

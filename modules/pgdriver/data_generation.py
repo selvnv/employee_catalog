@@ -1,3 +1,4 @@
+import copy
 import random
 
 from datetime import datetime
@@ -8,6 +9,8 @@ from mimesis.enums import Gender
 
 from numpy import logspace
 
+from modules.models.employee import InsertEmployee
+from modules.pgdriver.pgdriver import add_employee, add_employees
 
 DEFAULT_ORG_STRUCTURE = {
     "ceo": {
@@ -236,11 +239,16 @@ def calc_org_structure(
     for index in range(len(position_names)):
         # Вычисление количество сотрудников с данной должностью
         # Если доступно для распределения меньше сотрудников - берем весь доступный остаток
-        employees_by_position =  min(employee_count, int(employee_count * position_distribution[index]))
+        # Минимум 1 сотрудник на позицию
+        employees_by_position =  max(1, min(employee_count, int(employee_count * position_distribution[index])))
         employee_count_by_position.append(employees_by_position)
 
         # Получение оставшегося количества сотрудников, доступных для распределения
         employee_count -= employees_by_position
+
+    # Если есть не распределенный остаток, добавить его к нижнему уровню структуры сотрудников
+    if employee_count > 0:
+        employee_count_by_position[-1] += employee_count
 
     employee_structure = {}
     for index in range(len(position_names)):
@@ -254,7 +262,7 @@ def calc_org_structure(
     return employee_structure
 
 
-def generate_employee_data(person_generator: Person, position_info: dict, min_hire_date: str, max_hire_date: str) -> dict | None:
+def generate_employee_data(person_generator: Person, position_info: dict, min_hire_date: str, max_hire_date: str, manager_id: int = None) -> InsertEmployee | None:
 
     if not person_generator:
         print(f"\033[1m\033[93m[WARN] generate_employee_data(...) >>>>\033[0m person_generator is empty. ")
@@ -272,27 +280,29 @@ def generate_employee_data(person_generator: Person, position_info: dict, min_hi
         return None
 
     gender = random.choice(list(Gender))
-    person_data = {
-        "last_name": person_generator.last_name(gender=gender),
-        "first_name": person_generator.first_name(gender=gender),
-        "middle_name": person_generator.patronymic(gender=gender),
-        "position": position_info["position_name"],
-        "hire_date": random_date(min_hire_date,  max_hire_date),
-        "salary": generate_random_salary(position_info["min_salary"], position_info["max_salary"])
-    }
+    person = InsertEmployee(
+        last_name=person_generator.last_name(gender=gender),
+        first_name=person_generator.first_name(gender=gender),
+        middle_name=person_generator.patronymic(gender=gender),
+        position=position_info["position_name"],
+        hire_date=random_date(min_hire_date,  max_hire_date),
+        salary=generate_random_salary(position_info["min_salary"], position_info["max_salary"]),
+        employee_id=None,
+        manager_id=manager_id
+    )
 
-    return person_data
+    return person
 
 
-def generate_employees_catalog(
+def create_employees_catalog(
         total_count: int,
-        position_names: list,
+        position_names: list[str],
         min_salary: int = DEFAULT_MIN_SALARY,
         max_salary: int = DEFAULT_MAX_SALARY,
         min_hire_date: str = DEFAULT_MIN_HIRE_DATE,
         max_hire_date: str = DEFAULT_MAX_HIRE_DATE) -> list:
     """
-        Generates a list of employees with random personal data (with specified restrictions)
+        Generates and inserts a list of employees with random personal data (with specified restrictions)
 
         Args:
             total_count: count of employees in catalog
@@ -308,16 +318,36 @@ def generate_employees_catalog(
     if total_count <= 0:
         return []
 
-    if position_names is None or len(position_names) == 0:
+    if not position_names:
         return []
 
     org_structure = calc_org_structure(total_count, position_names, min_salary, max_salary)
 
     person_generator = Person(locale=Locale.RU)
     employees = []
-    for position in org_structure:
+    insertion_start_index = 0
+    manager_ids = []
+    employee_ids = []
+
+    for position in position_names:
         for _ in range(org_structure[position]["count"]):
-            person_data = generate_employee_data(person_generator, org_structure[position], min_hire_date, max_hire_date)
-            employees.append(person_data)
+            person = generate_employee_data(
+                person_generator,
+                org_structure[position],
+                min_hire_date,
+                max_hire_date,
+                random.choice(manager_ids) if manager_ids else None
+            )
+            employees.append(person)
+
+        # На следующем уровне иерархии используются id текущего уровня
+        manager_ids = add_employees(employees[insertion_start_index:])
+
+        employee_ids.extend(manager_ids)
+        insertion_start_index = len(employees)
+
+    # Дополнение данных сотрудников их id
+    for person, emp_id in zip(employees, employee_ids):
+        person.employee_id = emp_id
 
     return employees

@@ -71,7 +71,15 @@ uv pip install -e .
 # Использование cli пакета при разработке
 # uv run edb <command_name>
 uv run edb tree
+
+# Вывод с ограничениями
 uv run edb lst --where past_name eq Doe --where salary gt 10
+
+# Генерация + вставка данных в базу данных
+uv run edb gen --count 100 --salary 100000 500000 ceo manager team_lead senior_developer developer
+
+# Удаление всех строк (сотрудников) из базы данных (с подтверждением)
+uv run edb drop
 ```
 
 ### Реализация
