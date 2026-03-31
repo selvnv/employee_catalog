@@ -1,9 +1,14 @@
 [project]
-name = "employee-catalog"
+name = "edb-utility"
 version = "0.1.0"
-description = "Add your description here"
+description = "Employee Database Management Utility"
 readme = "README.md"
 requires-python = ">=3.12"
+
+authors = [
+    { name = "selvnv"}
+]
+
 dependencies = [
     "click>=8.3.1",
     "mimesis>=19.1.0",
