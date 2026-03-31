@@ -1,9 +1,10 @@
-name: Build Python Package
+name: Release Python Package
 
 on:
-  # Триггер на пуш в ветку main
+  # Триггер на пуш с релизным тегом
   push:
-    branches: [ "main" ]
+    tags:
+      - "v*"
 
 jobs:
   build:
@@ -34,9 +35,8 @@ jobs:
     - name: Build package
       run: python -m build
 
-    # Сохранить артефакты
-    - name: Upload artifacts
-      uses: actions/upload-artifact@v4
+    # Создать релиз с файлами из каталога сборки dist/
+    - name: Create GitHub Release
+      uses: softprops/action-gh-release@v2
       with:
-        name: dist-files
-        path: dist/
+          files: dist/*
