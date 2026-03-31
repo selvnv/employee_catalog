@@ -15,12 +15,14 @@
 
 ### Описание команд
 
-| Команда CLI | Назначение | Что реализовать внутри |
-|---|---|---|
-| `seed --n 50000` | Генерация и загрузка данных | Сгенерировать данные (например, Mimesis) и вставить в PostgreSQL |
-| `list --sort ... --filter ...` | Табличный вывод | `SELECT` + `WHERE` (фильтры) + `ORDER BY` (whitelist) + `LIMIT` |
-| `tree` | Древовидный вывод | Рекурсивный запрос + печать с отступами |
-| `add/update/delete` | CRUD-операции | `INSERT/UPDATE/DELETE` для одной записи |
+| Команда CLI                                                                                                 | Назначение | Внутренняя реализация                                                                 |
+|-------------------------------------------------------------------------------------------------------------|---|---------------------------------------------------------------------------------------|
+| `edb gen -c 1000 -s 10000 100000 -h 2025-01-01 2026-01-01 ceo manager team_lead senior_developer developer` | Генерация и загрузка данных | Генерация наполнения каталога сотрудников (библиотека Mimesis) и вставка в PostgreSQL |
+| `edb list -w id gt 1300 --limit 10 --order salary`                                                          | Табличный вывод | `SELECT` + `WHERE` (фильтры) + `ORDER BY` (whitelist) + `LIMIT`                       |
+| `edb tree -t team_lead`                                                                                     | Древовидный вывод | Рекурсивный CTE + вывод с форматированием                                             |
+| `edb add -l Testov -f Test -p developer -h 2026-01-05 -s 5000 -m 1000`                                                                                     | CRUD-операции | `INSERT` для одной записи                                                             |
+| `edb update --salary 7000 1402`                                                                                     | CRUD-операции | `UPDATE` для одной записи                                                             |
+| `edb delete 1402`                                                                                     | CRUD-операции | `DELETE` для нескольких записей                                                       |
 
 ### Чеклист
 - [x] Создана база данных и таблица для хранения данных о сотрудниках (ФИО, должность, дата приема, зарплата).
@@ -39,10 +41,17 @@
 
 ### Установка утилиты управления базой данных сотрудников
 
-Утилита поставляется в виде дистрибутива - предварительно скомпилированного python-пакета `.whl`. Для использования, достаточно установить пакет
+Утилита поставляется в виде дистрибутива - предварительно скомпилированного python-пакета `.whl`. Этот пакет находится в релизе репозитория, откуда его можно свободно скачать 
 
 ```bash
-pip install dist/employee_catalog-0.1.0-py3-none-any.whl
+# Пример скачивания пакета из релиза по ссылке из консоли
+curl -L -O https://github.com/selvnv/employee_catalog/releases/download/v0.1.0/edb_utility-0.1.0-py3-none-any.whl
+
+# Установка скачанного пакета
+pip install edb_utility-0.1.0-py3-none-any.whl
+
+pip list | grep edb
+edb-utility             0.1.0
 ```
 
 После установки пакета, в командной строке будет доступна команда `edb`:
@@ -61,6 +70,37 @@ Commands:
   list
   tree
   update
+```
+
+Однако для ее использования необходимы данные для подключения к базе данных
+
+Их утилита ищет в конфиг файле `./.env/connection.env`, либо из переменных окружения:
+- PG_HOST
+- PG_PORT
+- PG_DB_NAME
+- PG_USER
+- PG_PASSWORD
+
+```bash
+# Для тестов переменные окружения можно установить для текущей сессии терминала
+export PG_HOST=localhost PG_PORT=5435 PG_DB_NAME=employees PG_USER=catalog_app PG_PASSWORD=catalog_app
+
+# Выполнение запроса
+edb list -w last_name eq "Зуева"
+[INFO] Reading postgres config file...
+Path ./.env/connection.env does not exists
+[INFO] Check database connection...
+[WARN] Healthcheck failed connection to server at "localhost" (::1), port 5432 failed: fe_sendauth: no password supplied
+
+[INFO] Reading environment variables...
+╭──────┬─────────────┬──────────────┬───────────────┬────────────┬─────────────┬──────────┬──────────────╮
+│   id │ last_name   │ first_name   │ middle_name   │ position   │ hire_date   │   salary │   manager_id │
+├──────┼─────────────┼──────────────┼───────────────┼────────────┼─────────────┼──────────┼──────────────┤
+│  303 │ Зуева       │ Мелания      │ Измаиловна    │ manager    │ 2024-05-17  │       69 │          302 │
+╰──────┴─────────────┴──────────────┴───────────────┴────────────┴─────────────┴──────────┴──────────────╯
+
+Page 1 of 1.Rows 1 of 1. 
+Press enter to continue (q to skip\exit): 
 ```
 
 ### Запуск базы данных для тестирования
