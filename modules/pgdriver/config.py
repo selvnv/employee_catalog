@@ -167,7 +167,7 @@ class PostgresConfig:
             return True
 
         except Exception as error:
-            print(f"\033[1m\033[91m[WARN] healthcheck(...) >>>>\033[0m Healthcheck failed", repr(error))
+            print(f"\033[1m\033[91m[WARN]\033[0m Healthcheck failed", error)
             return False
 
         finally:

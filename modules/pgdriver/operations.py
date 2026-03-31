@@ -4,18 +4,37 @@ from datetime import datetime
 
 from click import IntRange, FloatRange, DateTime
 
-from .pgdriver import read_pg_config
+from .pgdriver import read_pg_config, read_config_from_env, check_connection
 from .pgdriver import list_employees, add_employee, delete_employees, update_employee, drop_data, select_hierarchy
 from .data_generation import create_employees_catalog
 
-from modules.utils.utils import print_employee_table_paged, print_hierarchy
+from modules.utils.utils import print_employee_table_paged, build_employee_tree, print_employee_tree
 
 from modules.models.employee import UpdateEmployee, InsertEmployee
 
 
 @click.group(name='edb')
 def edb():
-    read_pg_config("./.env/connection.env")
+    try:
+        print("\033[1m\033[94m[INFO]\033[0m Reading postgres config file...")
+        # Перед выполнением команды читается конфиг
+        read_pg_config("./.env/connection.env")
+
+        print("\033[1m\033[94m[INFO]\033[0m Check database connection...")
+        is_connected = check_connection()
+        if is_connected:
+            print("\033[1m\033[94m[INFO]\033[0m Connected.")
+        else:
+            print("\033[1m\033[94m[INFO]\033[0m Reading environment variables...")
+            read_config_from_env()
+            is_connected = check_connection()
+            if not is_connected:
+                print(
+                    "\033[1m\033[93m[ERROR]\033[0m Connection failed. Try to set up environment variables and try again." +
+                    "Variables: \"PG_HOST\", \"PG_PORT\", \"PG_DB_NAME\", \"PG_USER\", \"PG_PASSWORD\"")
+
+    except Exception as error:
+        print(f"\033[1m\033[91m[ERROR] gen(...) >>>>\033[0m Error occurred while reading database connection credentials. {repr(error)}")
 
 
 @edb.command(name="gen")
@@ -169,7 +188,8 @@ def lst(limit, order, where):
 @click.option("--top-position", "-t", nargs=1, type=str, required=True)
 def tree(top_position):
     employees = select_hierarchy(top_position)
-    print_hierarchy(employees)
+    employee_tree = build_employee_tree(employees)
+    print_employee_tree(employee_tree)
 
 
 @edb.command()

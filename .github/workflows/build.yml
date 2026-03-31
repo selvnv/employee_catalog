@@ -1,0 +1,42 @@
+name: Build Python Package
+
+on:
+  # Триггер на пуш в ветку main
+  push:
+    branches: [ "main" ]
+
+jobs:
+  build:
+    # Сборка на раннере с ubuntu
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: write
+
+    steps:
+    # Скачать код
+    - name: Checkout repository
+      uses: actions/checkout@v4
+
+    # Установить Python
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: "3.12"
+
+    # Установить зависимости для сборки
+    - name: Install build tools
+      run: |
+        python -m pip install --upgrade pip
+        pip install build
+
+    # Собрать пакет
+    - name: Build package
+      run: python -m build
+
+    # Сохранить артефакты
+    - name: Upload artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: dist-files
+        path: dist/

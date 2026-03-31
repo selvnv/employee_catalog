@@ -2,15 +2,8 @@ import math
 
 from tabulate import tabulate
 
-DEFAULT_TABLE_HEADERS = ["id", "last_name", "first_name", "middle_name", "position", "hire_date", "salary", "manager_id"]
 
-def print_employee_table(row_data,
-                         headers: list = DEFAULT_TABLE_HEADERS):
-    print(tabulate(
-        row_data,
-        headers=headers,
-        tablefmt="rounded_grid"
-    ))
+DEFAULT_TABLE_HEADERS = ["id", "last_name", "first_name", "middle_name", "position", "hire_date", "salary", "manager_id"]
 
 
 def print_employee_table_paged(row_data,
@@ -33,38 +26,59 @@ def print_employee_table_paged(row_data,
             tablefmt="rounded_grid"
         ))
 
-        user_choice = input(f"\nPage {current_page + 1} of {total_pages}. Rows {end_row} of {total_rows}. \nPress \033[1m\033[92menter\033[0m to continue (\033[1m\033[92mq\033[0m to skip\\exit): ")
+        user_choice = input(
+            f"\nPage {current_page + 1} of {total_pages}." +
+            f"Rows {end_row} of {total_rows}. \n" +
+            f"Press \033[1m\033[92menter\033[0m to continue (\033[1m\033[92mq\033[0m to skip\\exit): "
+        )
         if user_choice == "q":
             break
 
         current_page += 1
 
 
-def print_hierarchy(row_data):
-    levels = [row[5] for row in row_data]
-    max_level = max(levels)
-    is_last_level = [False for _ in range(max_level + 1)]
+def build_employee_tree(row_data):
+    nodes = {}
 
-    row_count = len(row_data)
+    for row in row_data:
+        if len(row) < 6:
+            continue
 
-    for i, row in enumerate(row_data):
-        current_row_level = row[5]
-        if i < row_count - 1:
-            next_row_level = row_data[i + 1][5]
+        employee_id = row[0]
+        # Создание ноды с ключом == id сотрудника
+        nodes[employee_id] = {
+            "id": employee_id,
+            "title": f"{row[2]} {row[3]} {row[4] if row[4] else ""} {row[5]}",
+            "children": []
+        }
 
-            # Является ли элемент листовым на своем уровне
-            is_last_on_level = not current_row_level in levels[i+1:]
-            if is_last_on_level:
-                is_last_level[current_row_level] = True
+    # На старте все ноды считаются корневыми
+    # И исключаются из списка по мере определения их как child_nodes
+    root_ids = set(nodes.keys())
 
-            # Является ли наиболее вложенным
-            is_deepest = max_level == max_level and current_row_level > next_row_level
+    for row in row_data:
+        employee_id = row[0]
+        manager_id = row[1]
 
-            connector = "└── " if is_last_on_level or is_deepest else "├── "
-            prefix = ""
-            for x in range(0, current_row_level):
-                prefix += "│   " if not is_last_level[x] else "    "
+        # Если нода является дочерней и родительская нода есть в выборке
+        if manager_id and manager_id in nodes:
+            # Добавляем родительской ноде потомка (текущий узел)
+            nodes[manager_id]["children"].append(nodes[employee_id])
+            root_ids.discard(employee_id)
 
-            print(prefix + connector + ", ".join(row[1:5]))
-        else:
-            print(("    " * current_row_level) + "└── ", ", ".join(row[1:5]))
+    return [nodes[root_id] for root_id in root_ids]
+
+
+# Обход дерева сотрудников в глубину
+def print_employee_tree(employee_subtree, prefix=""):
+    for i, node in enumerate(employee_subtree):
+        # Проверка - нода последний лист в поддереве
+        is_last_node = i == len(employee_subtree) - 1
+
+        connector = "└── " if is_last_node else "├── "
+        print(prefix + connector + node["title"])
+
+        # Если нода последняя, то после └── не должно быть │
+        child_node_prefix = prefix + ("    " if is_last_node else "│   ")
+
+        print_employee_tree(node["children"], child_node_prefix)

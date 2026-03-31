@@ -6,6 +6,7 @@ from .config import POSTGRES_CONFIG
 
 from modules.models.employee import UpdateEmployee, InsertEmployee
 
+
 ALLOWED_ORDER_BY_FIELDS = {"id", "last_name", "first_name", "position", "hire_date", "salary"}
 ALLOWED_COMPARISON_FIELDS = {"id", "last_name", "first_name", "middle_name", "position", "hire_date", "salary", "manager_id"}
 ALLOWED_COMPARISON_OPERATORS={
@@ -26,6 +27,14 @@ def read_pg_config(config_path: str) -> None:
         POSTGRES_CONFIG.load_from_env_file(config_path)
     except Exception as e:
         print(e)
+
+
+def read_config_from_env() -> None:
+    POSTGRES_CONFIG.load_from_env()
+
+
+def check_connection():
+    return POSTGRES_CONFIG.healthcheck()
 
 
 # input: (('last_name', 'eq', 'Doe'), ('salary', 'ge', '1000'))
@@ -96,20 +105,20 @@ def add_employee(employee: InsertEmployee) -> int:
         return -1
 
     try:
-        with POSTGRES_CONFIG.get_connection() as connection:
-            with connection.cursor() as cursor:
-                cursor.execute(
-                    """
-                    INSERT INTO employees (last_name, first_name, middle_name, position, hire_date, salary, manager_id) 
-                    VALUES (%s, %s, %s, %s, %s, %s, %s)
-                    RETURNING id
-                    """,
-                    employee.to_insertion_row(),
-                )
+            with POSTGRES_CONFIG.get_connection() as connection:
+                with connection.cursor() as cursor:
+                    cursor.execute(
+                        """
+                        INSERT INTO employees (last_name, first_name, middle_name, position, hire_date, salary, manager_id) 
+                        VALUES (%s, %s, %s, %s, %s, %s, %s)
+                        RETURNING id
+                        """,
+                        employee.to_insertion_row(),
+                    )
 
-                # cursor.fetchone() returns tuple like (id,)
-                employee_id = cursor.fetchone()[0]
-                return employee_id
+                    # cursor.fetchone() returns tuple like (id,)
+                    employee_id = cursor.fetchone()[0]
+                    return employee_id
     except Exception as error:
         print(f"\033[1m\033[91m[ERROR] add_employee(...) >>>>\033[0m {error}")
         raise
@@ -260,18 +269,18 @@ def select_hierarchy(top_position: str):
             with connection.cursor() as cursor:
                 query = f"""
                     WITH RECURSIVE hierarchy AS (
-                        SELECT id, last_name, first_name, middle_name, position, 0 AS level
+                        SELECT id, manager_id, last_name, first_name, middle_name, position
                         FROM employees
                         WHERE position = %s
                     
                         UNION
                     
-                        SELECT e.id, e.last_name, e.first_name, e.middle_name, e.position, h.level + 1
+                        SELECT e.id, e.manager_id, e.last_name, e.first_name, e.middle_name, e.position
                         FROM employees AS e
                         JOIN hierarchy AS h ON h.id = e.manager_id
-                    ) SEARCH DEPTH FIRST BY id SET path
+                    )
                 
-                SELECT * FROM hierarchy ORDER BY path;
+                    SELECT * FROM hierarchy;
                 """
 
                 cursor.execute(query, (top_position,))
